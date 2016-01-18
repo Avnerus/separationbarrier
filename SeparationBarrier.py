@@ -1,0 +1,114 @@
+import random
+import math
+
+from mesa import Model, Agent
+from mesa.time import RandomActivation
+from mesa.space import Grid
+from mesa.datacollection import DataCollector
+
+
+class Israeli(Agent):
+    def __init__(self, unique_id, pos, vision,  model):
+
+        super(Israeli, self).__init__(unique_id, model)
+
+        self.unique_id = unique_id
+        self.pos = pos
+        self.vision = vision
+
+    def step(self, model):
+        self.update_neighbors(model)
+
+    def update_neighbors(self, model):
+        """
+        Look around and see who my neighbors are
+        """
+        self.neighborhood = model.grid.get_neighborhood(self.pos,
+                                                        moore=False, radius=1)
+        self.neighbors = model.grid.get_cell_list_contents(self.neighborhood)
+        self.empty_neighbors = [c for c in self.neighborhood if
+                                model.grid.is_cell_empty(c)]
+
+
+class Palestinian(Agent):
+
+    def __init__(self, unique_id, pos, vision, model):
+
+        super(Palestinian, self).__init__(unique_id, model)
+        self.unique_id = unique_id
+        self.pos = pos
+        self.vision = vision
+
+    def step(self, model):
+        """
+        Inspect local vision and arrest a random active agent. Move if
+        applicable.
+        """
+        self.update_neighbors(model)
+
+    def update_neighbors(self, model):
+        """
+        Look around and see who my neighbors are.
+        """
+        self.neighborhood = model.grid.get_neighborhood(self.pos,
+                                                        moore=False, radius=1)
+        self.neighbors = model.grid.get_cell_list_contents(self.neighborhood)
+        self.empty_neighbors = [c for c in self.neighborhood if
+                                model.grid.is_cell_empty(c)]
+
+
+class SeparationBarrierModel(Model):
+    def __init__(self, height, width, israeli_density, palestinian_density,
+                 israeli_vision, palestinian_vision, 
+                 movement=True, max_iters=1000):
+
+        super(SeparationBarrierModel, self).__init__()
+        self.height = height
+        self.width = width
+        self.israeli_density = israeli_density
+        self.palestinian_density = palestinian_density
+        self.israeli_vision = israeli_vision
+        self.palestinian_vision = palestinian_vision
+        self.movement = movement
+        self.running = True
+        self.max_iters = max_iters
+        self.iteration = 0
+        self.schedule = RandomActivation(self)
+        self.grid = Grid(height, width, torus=True)
+
+        model_reporters = {
+        }
+        agent_reporters = {
+            "x": lambda a: a.pos[0],
+            "y": lambda a: a.pos[1],
+        }
+        self.dc = DataCollector(model_reporters=model_reporters,
+                                agent_reporters=agent_reporters)
+        unique_id = 0
+
+        # Israelis and palestinans split the region in half
+
+        for (contents, x, y) in self.grid.coord_iter():
+            if (y < self.grid.height / 2):
+                if random.random() < self.palestinian_density:
+                    palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision,
+                              model=self)
+                    unique_id += 1
+                    self.grid[y][x] = palestinian
+                    self.schedule.add(palestinian)
+            elif random.random() < self.israeli_density:
+                israeli = Israeli(unique_id, (x, y),
+                                  vision=self.israeli_vision, model=self)
+                unique_id += 1
+                self.grid[y][x] = israeli
+                self.schedule.add(israeli)
+
+    def step(self):
+        """
+        Advance the model by one step and collect data.
+        """
+        self.schedule.step()
+        self.dc.collect(self)
+        self.iteration += 1
+        #if self.iteration > self.max_iters:
+        #    self.running = False
