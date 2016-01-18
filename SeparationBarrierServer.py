@@ -1,9 +1,12 @@
 from SeparationBarrier import Israeli, Palestinian, SeparationBarrierModel
+from SeparationBarrierGrid import SeparationBarrierGrid
+
 from mesa.visualization.ModularVisualization import ModularServer
 from mesa.visualization.modules import CanvasGrid
 
+
 ISRAELI_COLOR = "#0000FF"
-PALESTINIAN_COLOR = "#00FF00"
+PALESTINIAN_COLOR = "#FF0000"
 
 def israeli_palestinian_portrayl(agent):
     if agent is None:
@@ -25,11 +28,11 @@ def israeli_palestinian_portrayl(agent):
         portrayal["Layer"] = 1
     return portrayal
 
-canvas_element = CanvasGrid(israeli_palestinian_portrayl, 100, 100, 500, 500)
+canvas_element = SeparationBarrierGrid(israeli_palestinian_portrayl, 50, 50, 800, 800)
 server = ModularServer(SeparationBarrierModel, [canvas_element],
                       "Israeli-Palestinian Separation Barrier",
-                      height=100,
-                      width=100,
+                      height=50,
+                      width=50,
                       israeli_density=0.4,
                       palestinian_density = 0.2,
                       israeli_vision=7,
