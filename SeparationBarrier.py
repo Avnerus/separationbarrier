@@ -58,7 +58,7 @@ class Palestinian(Agent):
 
 
 class SeparationBarrierModel(Model):
-    def __init__(self, height, width, israeli_density, palestinian_density,
+    def __init__(self, height, width, israeli_density, palestinian_density, settlement_density, 
                  israeli_vision, palestinian_vision, 
                  movement=True, max_iters=1000):
 
@@ -69,6 +69,7 @@ class SeparationBarrierModel(Model):
         self.palestinian_density = palestinian_density
         self.israeli_vision = israeli_vision
         self.palestinian_vision = palestinian_vision
+        self.settlement_density = settlement_density
         self.movement = movement
         self.running = True
         self.max_iters = max_iters
@@ -96,6 +97,13 @@ class SeparationBarrierModel(Model):
                     unique_id += 1
                     self.grid[y][x] = palestinian
                     self.schedule.add(palestinian)
+                elif ((y > (self.grid.height / 2) * (1-self.settlement_density)) and random.random() < self.settlement_density):
+                    israeli = Israeli(unique_id, (x, y),
+                                      vision=self.israeli_vision, model=self)
+                    unique_id += 1
+                    self.grid[y][x] = israeli
+                    self.schedule.add(israeli)
+
             elif random.random() < self.israeli_density:
                 israeli = Israeli(unique_id, (x, y),
                                   vision=self.israeli_vision, model=self)
