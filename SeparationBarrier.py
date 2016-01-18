@@ -8,16 +8,21 @@ from mesa.datacollection import DataCollector
 
 
 class Israeli(Agent):
-    def __init__(self, unique_id, pos, vision,  model):
+    def __init__(self, unique_id, pos, vision, breed,  model):
 
         super(Israeli, self).__init__(unique_id, model)
 
         self.unique_id = unique_id
         self.pos = pos
         self.vision = vision
+        self.breed = breed
 
     def step(self, model):
         self.update_neighbors(model)
+
+        if self.breed == "Settler":
+            palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
+            print('Settler at ', self.pos, ' Has ', len(palestinians_in_vision), ' Palestinians in vision')
 
     def update_neighbors(self, model):
         """
@@ -32,12 +37,13 @@ class Israeli(Agent):
 
 class Palestinian(Agent):
 
-    def __init__(self, unique_id, pos, vision, model):
+    def __init__(self, unique_id, pos, vision, breed, model):
 
         super(Palestinian, self).__init__(unique_id, model)
         self.unique_id = unique_id
         self.pos = pos
         self.vision = vision
+        self.breed = breed
 
     def step(self, model):
         """
@@ -92,21 +98,21 @@ class SeparationBarrierModel(Model):
         for (contents, x, y) in self.grid.coord_iter():
             if (y < self.grid.height / 2):
                 if random.random() < self.palestinian_density:
-                    palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision,
+                    palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
                               model=self)
                     unique_id += 1
                     self.grid[y][x] = palestinian
                     self.schedule.add(palestinian)
                 elif ((y > (self.grid.height / 2) * (1-self.settlement_density)) and random.random() < self.settlement_density):
                     israeli = Israeli(unique_id, (x, y),
-                                      vision=self.israeli_vision, model=self)
+                                      vision=self.israeli_vision, model=self, breed="Settler")
                     unique_id += 1
                     self.grid[y][x] = israeli
                     self.schedule.add(israeli)
 
             elif random.random() < self.israeli_density:
                 israeli = Israeli(unique_id, (x, y),
-                                  vision=self.israeli_vision, model=self)
+                                  vision=self.israeli_vision, model=self, breed="Citizen")
                 unique_id += 1
                 self.grid[y][x] = israeli
                 self.schedule.add(israeli)
@@ -115,8 +121,10 @@ class SeparationBarrierModel(Model):
         """
         Advance the model by one step and collect data.
         """
-        self.schedule.step()
-        self.dc.collect(self)
-        self.iteration += 1
+        if (self.iteration < 1):
+            self.schedule.step()
+            self.dc.collect(self)
+            print("Iteration %d " % self.iteration)
+            self.iteration += 1
         #if self.iteration > self.max_iters:
         #    self.running = False
