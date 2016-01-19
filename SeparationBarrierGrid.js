@@ -8,6 +8,7 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
     // Append it to body:
     var canvas = $(canvas_tag)[0];
     $("body").append(canvas);
+    $("body").css("background-color", "white")
 
     // Create the context and the drawing controller:
     var context = canvas.getContext("2d");

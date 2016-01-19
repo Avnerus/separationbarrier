@@ -7,6 +7,7 @@ from mesa.visualization.modules import CanvasGrid
 
 ISRAELI_COLOR = "#0000FF"
 PALESTINIAN_COLOR = "#FF0000"
+VIOLENT_COLOR = "#000000"
 
 def israeli_palestinian_portrayl(agent):
     if agent is None:
@@ -17,14 +18,17 @@ def israeli_palestinian_portrayl(agent):
                  "Filled": "true"}
 
     if type(agent) is Israeli:
-        color = ISRAELI_COLOR
-        portrayal["Color"] = ISRAELI_COLOR
-        portrayal["r"] = 0.5
+        color = VIOLENT_COLOR if agent.violent else ISRAELI_COLOR
+        portrayal["Color"] = color
+        size = 1.0 if agent.violent else 0.5
+        portrayal["r"] = portrayal["w"] = portrayal["h"] = size
         portrayal["Layer"] = 0
+        portrayal["Shape"] = "rect"
 
     elif type(agent) is Palestinian:
         portrayal["Color"] = PALESTINIAN_COLOR
-        portrayal["r"] = 0.5
+        size = 1.0 if agent.victim else 0.5
+        portrayal["r"] = size
         portrayal["Layer"] = 1
     return portrayal
 
@@ -36,7 +40,6 @@ server = ModularServer(SeparationBarrierModel, [canvas_element],
                       israeli_density=0.3,
                       settlement_density = 0.3,
                       palestinian_density = 0.2,
-                      israeli_vision=7,
-                      palestinian_vision=7
+                      settlers_violence_rate = 0.01
                       )
 server.launch()

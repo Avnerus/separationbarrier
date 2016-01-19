@@ -16,13 +16,23 @@ class Israeli(Agent):
         self.pos = pos
         self.vision = vision
         self.breed = breed
+        self.violent = False
+        self.victim = False
 
     def step(self, model):
         self.update_neighbors(model)
+        self.reset_state()
 
         if self.breed == "Settler":
             palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
-            print('Settler at ', self.pos, ' Has ', len(palestinians_in_vision), ' Palestinians in vision')
+            if len(palestinians_in_vision) > 0 and random.random() < model.settlers_violence_rate:
+                # Violent settler. Choose a random palestinian
+                print("Violent Settler!")
+                victim = random.choice(palestinians_in_vision)
+                self.violent = True
+                victim.victim = True
+
+
 
     def update_neighbors(self, model):
         """
@@ -34,6 +44,10 @@ class Israeli(Agent):
         self.empty_neighbors = [c for c in self.neighborhood if
                                 model.grid.is_cell_empty(c)]
 
+    def reset_state(self):
+        self.violent = False
+        self.victim = False
+
 
 class Palestinian(Agent):
 
@@ -44,6 +58,8 @@ class Palestinian(Agent):
         self.pos = pos
         self.vision = vision
         self.breed = breed
+        self.violent = False
+        self.victim = False
 
     def step(self, model):
         """
@@ -51,6 +67,7 @@ class Palestinian(Agent):
         applicable.
         """
         self.update_neighbors(model)
+        self.reset_state()
 
     def update_neighbors(self, model):
         """
@@ -62,10 +79,14 @@ class Palestinian(Agent):
         self.empty_neighbors = [c for c in self.neighborhood if
                                 model.grid.is_cell_empty(c)]
 
+    def reset_state(self):
+        self.violent = False
+        self.victim = False
 
 class SeparationBarrierModel(Model):
     def __init__(self, height, width, israeli_density, palestinian_density, settlement_density, 
-                 israeli_vision, palestinian_vision, 
+                 settlers_violence_rate,
+                 israeli_vision=1, palestinian_vision=1, 
                  movement=True, max_iters=1000):
 
         super(SeparationBarrierModel, self).__init__()
@@ -81,6 +102,7 @@ class SeparationBarrierModel(Model):
         self.max_iters = max_iters
         self.iteration = 0
         self.schedule = RandomActivation(self)
+        self.settlers_violence_rate = settlers_violence_rate
         self.grid = Grid(height, width, torus=True)
 
         model_reporters = {
@@ -121,7 +143,7 @@ class SeparationBarrierModel(Model):
         """
         Advance the model by one step and collect data.
         """
-        if (self.iteration < 1):
+        if (self.iteration < 10000000):
             self.schedule.step()
             self.dc.collect(self)
             print("Iteration %d " % self.iteration)
