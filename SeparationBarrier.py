@@ -20,14 +20,13 @@ class Israeli(Agent):
         self.victim = False
 
     def step(self, model):
-        self.update_neighbors(model)
         self.reset_state()
 
         if self.breed == "Settler":
+            self.update_neighbors(model)
             palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
             if len(palestinians_in_vision) > 0 and random.random() < model.settlers_violence_rate:
                 # Violent settler. Choose a random palestinian
-                print("Violent Settler!")
                 victim = random.choice(palestinians_in_vision)
                 self.violent = True
                 victim.victim = True
@@ -39,7 +38,7 @@ class Israeli(Agent):
         Look around and see who my neighbors are
         """
         self.neighborhood = model.grid.get_neighborhood(self.pos,
-                                                        moore=False, radius=1)
+                                                        moore=True, radius=1)
         self.neighbors = model.grid.get_cell_list_contents(self.neighborhood)
         self.empty_neighbors = [c for c in self.neighborhood if
                                 model.grid.is_cell_empty(c)]
@@ -47,6 +46,22 @@ class Israeli(Agent):
     def reset_state(self):
         self.violent = False
         self.victim = False
+
+
+class Barrier(Agent):
+
+    def __init__(self, unique_id, pos, model):
+
+        super(Barrier, self).__init__(unique_id, model)
+        self.unique_id = unique_id
+        self.pos = pos
+        self.breed = "Barrier"
+
+    def step(self, model):
+        """
+        Inspect local vision and arrest a random active agent. Move if
+        applicable.
+        """
 
 
 class Palestinian(Agent):
@@ -60,6 +75,10 @@ class Palestinian(Agent):
         self.breed = breed
         self.violent = False
         self.victim = False
+        self.anger = 0
+        self.freedom = 0
+        self.attackProbability = 0
+
 
     def step(self, model):
         """
@@ -67,6 +86,14 @@ class Palestinian(Agent):
         applicable.
         """
         self.update_neighbors(model)
+        self.update_level_of_freedom(model)
+
+        self.violence_probability = 1 - math.exp(-0.01 * ((1-self.freedom) + self.anger));
+        #print("Violence probability %f" % self.violence_probability)
+        if (random.random() < self.violence_probability):
+            print("Violent Palestinian!")
+        
+
         self.reset_state()
 
     def update_neighbors(self, model):
@@ -74,10 +101,20 @@ class Palestinian(Agent):
         Look around and see who my neighbors are.
         """
         self.neighborhood = model.grid.get_neighborhood(self.pos,
-                                                        moore=False, radius=1)
+                                                        moore=True, radius=1)
         self.neighbors = model.grid.get_cell_list_contents(self.neighborhood)
         self.empty_neighbors = [c for c in self.neighborhood if
                                 model.grid.is_cell_empty(c)]
+
+    def update_level_of_freedom(self, model):
+        counter = 0
+        for x in self.neighbors:
+            if x.breed == "Settler" or x.breed == "Barrier":
+                counter += 1
+
+        self.freedom = 1 - (counter / len(self.neighborhood))
+        #print("Level of freedom = 1 - (%d / %d = %f)" % (counter,len(self.neighborhood),self.freedom))
+
 
     def reset_state(self):
         self.violent = False
@@ -146,7 +183,7 @@ class SeparationBarrierModel(Model):
         if (self.iteration < 10000000):
             self.schedule.step()
             self.dc.collect(self)
-            print("Iteration %d " % self.iteration)
+            #print("Iteration %d " % self.iteration)
             self.iteration += 1
         #if self.iteration > self.max_iters:
         #    self.running = False
