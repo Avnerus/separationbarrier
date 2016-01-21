@@ -3,7 +3,7 @@ import math
 
 from mesa import Model, Agent
 from mesa.time import RandomActivation
-from mesa.space import Grid
+from mesa.space import SingleGrid
 from mesa.datacollection import DataCollector
 
 
@@ -23,12 +23,12 @@ class Settler(Agent):
         self.reset_state()
 
         self.update_neighbors(model)
-        palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
+        palestinians_in_vision = [x for x in self.neighbors if x.breed == "Palestinian"]
         if len(palestinians_in_vision) > 0 and random.random() < model.settlers_violence_rate:
             # Violent settler. Choose a random palestinian
             victim = random.choice(palestinians_in_vision)
             self.violent = True
-            victim.receive_violence()
+            victim.receive_violence(self, model)
 
 
 
@@ -46,8 +46,10 @@ class Settler(Agent):
         self.violent = False
         self.victim = False
 
-    def receive_violence(self):
+    def receive_violence(self, palestinian, model):
         self.victim = True
+        # Build a barrier
+        model.set_barrier(palestinian.pos)
 
 
 class Barrier(Agent):
@@ -64,7 +66,17 @@ class Barrier(Agent):
         Inspect local vision and arrest a random active agent. Move if
         applicable.
         """
+class IsraelRear(Agent):
 
+    def __init__(self, unique_id, pos, model):
+
+        super(IsraelRear, self).__init__(unique_id, model)
+        self.unique_id = unique_id
+        self.pos = pos
+        self.breed = "IsraelRear"
+
+    def step(self, model):
+        return
 
 class Palestinian(Agent):
 
@@ -108,7 +120,7 @@ class Palestinian(Agent):
                 # Violent settler. Choose a random palestinian
                 victim = random.choice(settlers_in_vision)
                 self.violent = True
-                victim.receive_violence()
+                victim.receive_violence(self, model)
 
 
     def update_neighbors(self, model):
@@ -124,7 +136,7 @@ class Palestinian(Agent):
     def update_level_of_freedom(self, model):
         counter = 0
         for x in self.neighbors:
-            if x.breed == "Settler" or x.breed == "Barrier":
+            if x.breed == "IsraelRear" or x.breed == "Settler" or x.breed == "Barrier":
                 counter += 1
 
         self.freedom = 1 - (counter / len(self.neighborhood))
@@ -138,7 +150,7 @@ class Palestinian(Agent):
     def anger_decay(self):
         self.anger = max(0, self.anger - 0.1)
 
-    def receive_violence(self):
+    def receive_violence(self, settler, model):
         self.victim = True
         self.anger += 0.5
 
@@ -161,7 +173,7 @@ class SeparationBarrierModel(Model):
         self.iteration = 0
         self.schedule = RandomActivation(self)
         self.settlers_violence_rate = settlers_violence_rate
-        self.grid = Grid(height, width, torus=True)
+        self.grid = SingleGrid(height, width, torus=True)
 
         model_reporters = {
         }
@@ -175,18 +187,32 @@ class SeparationBarrierModel(Model):
 
         # Israelis and palestinans split the region in half
         for (contents, x, y) in self.grid.coord_iter():
-            if y < (self.grid.height - 1) and random.random() < self.palestinian_density:
+            if y == self.grid.height - 1:
+                unique_id += 1
+                israel_rear = IsraelRear(unique_id, (x, y), model=self)
+                self.grid.position_agent(israel_rear, x,y)
+            elif random.random() < self.palestinian_density:
                 palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
                           model=self)
                 unique_id += 1
-                self.grid[y][x] = palestinian
+                self.grid.position_agent(palestinian, x,y)
                 self.schedule.add(palestinian)
             elif ((y > (self.grid.height) * (1-self.settlement_density)) and y < (self.grid.height - 1) and random.random() < self.settlement_density):
                 settler = Settler(unique_id, (x, y),
                                   vision=self.settler_vision, model=self, breed="Settler")
                 unique_id += 1
-                self.grid[y][x] = settler
+                self.grid.position_agent(settler, x,y)
                 self.schedule.add(settler)
+
+    def set_barrier(self,pos):
+        (x,y)  = pos
+        current = self.grid[y][x]
+        print ("Set barrier!!", pos, current)
+        self.grid.move_to_empty(current)
+        print ("Moved to empty")
+        barrier = Barrier(-1, pos, model=self)
+        self.grid.position_agent(barrier, x,y)
+        
 
     def step(self):
         """
