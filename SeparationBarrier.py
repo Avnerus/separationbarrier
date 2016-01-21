@@ -7,10 +7,10 @@ from mesa.space import Grid
 from mesa.datacollection import DataCollector
 
 
-class Israeli(Agent):
+class Settler(Agent):
     def __init__(self, unique_id, pos, vision, breed,  model):
 
-        super(Israeli, self).__init__(unique_id, model)
+        super(Settler, self).__init__(unique_id, model)
 
         self.unique_id = unique_id
         self.pos = pos
@@ -22,14 +22,13 @@ class Israeli(Agent):
     def step(self, model):
         self.reset_state()
 
-        if self.breed == "Settler":
-            self.update_neighbors(model)
-            palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
-            if len(palestinians_in_vision) > 0 and random.random() < model.settlers_violence_rate:
-                # Violent settler. Choose a random palestinian
-                victim = random.choice(palestinians_in_vision)
-                self.violent = True
-                victim.victim = True
+        self.update_neighbors(model)
+        palestinians_in_vision = [x for x in self.neighbors if x.breed == 'Palestinian']
+        if len(palestinians_in_vision) > 0 and random.random() < model.settlers_violence_rate:
+            # Violent settler. Choose a random palestinian
+            victim = random.choice(palestinians_in_vision)
+            self.violent = True
+            victim.receive_violence()
 
 
 
@@ -46,6 +45,9 @@ class Israeli(Agent):
     def reset_state(self):
         self.violent = False
         self.victim = False
+
+    def receive_violence(self):
+        self.victim = True
 
 
 class Barrier(Agent):
@@ -85,16 +87,29 @@ class Palestinian(Agent):
         Inspect local vision and arrest a random active agent. Move if
         applicable.
         """
+        self.reset_state()
+    
+        self.anger_decay()
         self.update_neighbors(model)
         self.update_level_of_freedom(model)
 
         self.violence_probability = 1 - math.exp(-0.01 * ((1-self.freedom) + self.anger));
-        #print("Violence probability %f" % self.violence_probability)
-        if (random.random() < self.violence_probability):
-            print("Violent Palestinian!")
-        
+        self.suicide_bombing_probability = 1 - math.exp(-0.0001 * ((1-self.freedom) + self.anger));
+        chance = random.random()
 
-        self.reset_state()
+        if (chance < self.suicide_bombing_probability):
+            print ("Sucicide bomb!!")
+        #print("Violence probability %f" % self.violence_probability)
+        elif (chance < self.violence_probability):
+            # Look for settler neighbours
+            settlers_in_vision = [x for x in self.neighbors if x.breed == 'Settler']
+            if len(settlers_in_vision) > 0:
+                print("Violent Palestinian!")
+                # Violent settler. Choose a random palestinian
+                victim = random.choice(settlers_in_vision)
+                self.violent = True
+                victim.receive_violence()
+
 
     def update_neighbors(self, model):
         """
@@ -120,18 +135,24 @@ class Palestinian(Agent):
         self.violent = False
         self.victim = False
 
+    def anger_decay(self):
+        self.anger = max(0, self.anger - 0.1)
+
+    def receive_violence(self):
+        self.victim = True
+        self.anger += 0.5
+
 class SeparationBarrierModel(Model):
-    def __init__(self, height, width, israeli_density, palestinian_density, settlement_density, 
+    def __init__(self, height, width, palestinian_density, settlement_density,
                  settlers_violence_rate,
-                 israeli_vision=1, palestinian_vision=1, 
+                 settler_vision=1, palestinian_vision=1, 
                  movement=True, max_iters=1000):
 
         super(SeparationBarrierModel, self).__init__()
         self.height = height
         self.width = width
-        self.israeli_density = israeli_density
         self.palestinian_density = palestinian_density
-        self.israeli_vision = israeli_vision
+        self.settler_vision = settler_vision
         self.palestinian_vision = palestinian_vision
         self.settlement_density = settlement_density
         self.movement = movement
@@ -153,28 +174,19 @@ class SeparationBarrierModel(Model):
         unique_id = 0
 
         # Israelis and palestinans split the region in half
-
         for (contents, x, y) in self.grid.coord_iter():
-            if (y < self.grid.height / 2):
-                if random.random() < self.palestinian_density:
-                    palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
-                              model=self)
-                    unique_id += 1
-                    self.grid[y][x] = palestinian
-                    self.schedule.add(palestinian)
-                elif ((y > (self.grid.height / 2) * (1-self.settlement_density)) and random.random() < self.settlement_density):
-                    israeli = Israeli(unique_id, (x, y),
-                                      vision=self.israeli_vision, model=self, breed="Settler")
-                    unique_id += 1
-                    self.grid[y][x] = israeli
-                    self.schedule.add(israeli)
-
-            elif random.random() < self.israeli_density:
-                israeli = Israeli(unique_id, (x, y),
-                                  vision=self.israeli_vision, model=self, breed="Citizen")
+            if y < (self.grid.height - 1) and random.random() < self.palestinian_density:
+                palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
+                          model=self)
                 unique_id += 1
-                self.grid[y][x] = israeli
-                self.schedule.add(israeli)
+                self.grid[y][x] = palestinian
+                self.schedule.add(palestinian)
+            elif ((y > (self.grid.height) * (1-self.settlement_density)) and y < (self.grid.height - 1) and random.random() < self.settlement_density):
+                settler = Settler(unique_id, (x, y),
+                                  vision=self.settler_vision, model=self, breed="Settler")
+                unique_id += 1
+                self.grid[y][x] = settler
+                self.schedule.add(settler)
 
     def step(self):
         """
