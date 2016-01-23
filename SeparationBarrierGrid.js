@@ -31,8 +31,8 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
         // The 1967 Green line
         context.beginPath();
         context.strokeStyle = "#00ff00";
-        context.moveTo(0.5, canvas_height - 14 );
-        context.lineTo(canvas_width, canvas_height - 14);
+        context.moveTo(0.5, canvas_height );
+        context.lineTo(canvas_width, canvas_height);
         context.stroke();
     }
 };

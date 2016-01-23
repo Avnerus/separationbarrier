@@ -194,17 +194,13 @@ class SeparationBarrierModel(Model):
 
         # Israelis and palestinans split the region in half
         for (contents, x, y) in self.grid.coord_iter():
-            if y == self.grid.height - 1:
-                self.unique_id += 1
-                israel_rear = IsraelRear(self.unique_id, (x, y), model=self)
-                self.grid.position_agent(israel_rear, x,y)
-            elif random.random() < self.palestinian_density:
+            if random.random() < self.palestinian_density:
                 palestinian = Palestinian(self.unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
                           model=self)
                 self.unique_id += 1
                 self.grid.position_agent(palestinian, x,y)
                 self.schedule.add(palestinian)
-            elif ((y > (self.grid.height) * (1-self.settlement_density)) and y < (self.grid.height - 1) and random.random() < self.settlement_density):
+            elif ((y > (self.grid.height) * (1-self.settlement_density)) and random.random() < self.settlement_density):
                 settler = Settler(self.unique_id, (x, y),
                                   vision=self.settler_vision, model=self, breed="Settler")
                 self.unique_id += 1

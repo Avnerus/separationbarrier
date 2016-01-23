@@ -64,6 +64,6 @@ server = ModularServer(SeparationBarrierModel, [canvas_element],
                       settler_vision = 5,
                       palestinian_vision = 5,
                       settlers_growth_rate = 0.005,
-                      greed_level=0
+                      greed_level=10
                       )
 server.launch()
