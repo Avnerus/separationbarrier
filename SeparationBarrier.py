@@ -28,10 +28,11 @@ class Settler(Agent):
             # Violent settler. Choose a random palestinian
             victim = random.choice(palestinians_in_vision)
             self.violent = True
+            model.violence_count += 1
             victim.receive_violence(self, model)
 
         if len(self.empty_neighbors) > 0 and random.random() < self.model.settlers_growth_rate:
-            print("Another settler!!")
+            #print("Another settler!!")
             self.model.add_settler(random.choice(self.empty_neighbors))
 
 
@@ -52,7 +53,7 @@ class Settler(Agent):
     def receive_violence(self, palestinian, model):
         self.victim = True
         # Build a barrier
-        model.set_barrier(self.pos)
+        model.set_barrier(self.pos, palestinian.pos)
 
 
 class Barrier(Agent):
@@ -107,22 +108,31 @@ class Palestinian(Agent):
         self.update_neighbors(model)
         self.update_level_of_freedom(model)
 
-        self.violence_probability = 1 - math.exp(-0.01 * ((1-self.freedom) + self.anger));
-        self.suicide_bombing_probability = 1 - math.exp(-0.0001 * ((1-self.freedom) + self.anger));
+
+
+        self.violence_probability = (1 - math.exp(-1.5* ((1-self.freedom) * 0.01  + self.anger * 2))) * (1-self.blockage)
+        self.suicide_bombing_probability = self.violence_probability * model.suicide_rate
+        if (self.anger > 0):
+            print("Freedom: ", self.freedom, "Anger: ", self.anger, " Blocakge ", self.blockage)
+            print("Violence probability ", self.violence_probability, " Suicide: ", self.suicide_bombing_probability)
+            
         chance = random.random()
 
         if (chance < self.suicide_bombing_probability):
-            print ("Sucicide bomb!!")
+#            print ("Sucicide bomb!!", self.suicide_bombing_probability, chance)
             self.suicide = True
-        #print("Violence probability %f" % self.violence_probability)
+            self.anger = 0
+            model.violence_count += 5
         elif (chance < self.violence_probability):
             # Look for settler neighbours
             settlers_in_vision = [x for x in self.neighbors if x.breed == 'Settler']
             if len(settlers_in_vision) > 0:
-                #print("Violent Palestinian!")
+                #print("Violent Palestinian!", self.violence_probability)
                 # Violent settler. Choose a random palestinian
                 victim = random.choice(settlers_in_vision)
+                self.anger = 0
                 self.violent = True
+                model.violence_count += 1
                 victim.receive_violence(self, model)
 
 
@@ -138,12 +148,17 @@ class Palestinian(Agent):
 
     def update_level_of_freedom(self, model):
         counter = 0
+        barriers = 0
         for x in self.neighbors:
-            if x.breed == "IsraelRear" or x.breed == "Settler" or x.breed == "Barrier":
+            if x.breed == "Settler" or x.breed == "Barrier":
                 counter += 1
+            if x.breed == "Barrier":
+                barriers += 1
 
         self.freedom = 1 - (counter / len(self.neighborhood))
+        self.blockage = barriers / len(self.neighborhood)
         #print("Level of freedom = 1 - (%d / %d = %f)" % (counter,len(self.neighborhood),self.freedom))
+        #print("Level of Barrier =  (%d / %d = %f)" % (barriers,len(self.neighborhood),self.blockage))
 
 
     def reset_state(self):
@@ -152,15 +167,15 @@ class Palestinian(Agent):
         self.suicide = False
 
     def anger_decay(self):
-        self.anger = max(0, self.anger - 0.1)
+        self.anger = max(0, self.anger - 0.01)
 
     def receive_violence(self, settler, model):
         self.victim = True
-        self.anger += 0.5
+        self.anger += 0.1
 
 class SeparationBarrierModel(Model):
     def __init__(self, height, width, palestinian_density, settlement_density,
-                 settlers_violence_rate, settlers_growth_rate, greed_level,
+                 settlers_violence_rate, settlers_growth_rate, suicide_rate, greed_level,
                  settler_vision=1, palestinian_vision=1, 
                  movement=True, max_iters=1000):
 
@@ -178,7 +193,10 @@ class SeparationBarrierModel(Model):
         self.schedule = RandomActivation(self)
         self.settlers_violence_rate = settlers_violence_rate
         self.settlers_growth_rate = settlers_growth_rate
+        self.suicide_rate = suicide_rate
         self.greed_level = greed_level
+
+        self.total_violence = 0
 
         self.grid = SingleGrid(height, width, torus=False)
 
@@ -214,31 +232,45 @@ class SeparationBarrierModel(Model):
         self.grid.position_agent(settler, pos[0], pos[1])
         self.schedule.add(settler)
 
-    def set_barrier(self,pos):
+    def set_barrier(self,victim_pos, violent_pos):
         #print("Set barrier - Greed level", self.greed_level)
-        visible_spots = self.grid.get_neighborhood(pos,
+        visible_spots = self.grid.get_neighborhood(victim_pos,
                                                         moore=True, radius=self.greed_level + 1)
-        furthest_empty  = self.find_furthest_empty_or_palestinian(pos, visible_spots)
+        furthest_empty  = self.find_furthest_empty_or_palestinian(victim_pos, visible_spots)
         x,y = furthest_empty
         current = self.grid[y][x]
         #print ("Set barrier!!", pos, current)
+        free = True
         if (current is not None and current.breed == "Palestinian"):
             #print ("Relocating Palestinian")
-            self.relocate_palestinian(current)
-        barrier = Barrier(-1, pos, model=self)
-        self.grid.position_agent(barrier, x,y)
+           free =  self.relocate_palestinian(current, current.pos)
 
-    def relocate_palestinian(self, palestinian):
-        #print ("Relocating Palestinian in ", palestinian.pos)
-        visible_spots = self.grid.get_neighborhood(palestinian.pos,
+        if (free):
+            barrier = Barrier(-1, furthest_empty, model=self)
+            self.grid.position_agent(barrier, x,y)
+        
+        # Relocate the violent palestinian
+        #violent_x, violent_y = violent_pos
+        #if violent_pos != furthest_empty:
+        #    violent_palestinian = self.grid[violent_y][violent_x]
+        #    self.relocate_palestinian(violent_palestinian, furthest_empty)
+
+    def relocate_palestinian(self, palestinian, destination):
+        #print ("Relocating Palestinian in ", palestinian.pos, "To somehwhere near ", destination)
+        visible_spots = self.grid.get_neighborhood(destination,
                                                         moore=True, radius=palestinian.vision)
-        nearest_empty = self.find_nearest_empty(palestinian.pos, visible_spots)
+        nearest_empty = self.find_nearest_empty(destination, visible_spots)
         #print("First Nearest empty to ", palestinian.pos, " Is ", nearest_empty)
         if (nearest_empty):
             self.grid.move_agent(palestinian, nearest_empty)
         else:
             #print ("Moveing to random empty")
-            self.grid.move_to_empty(palestinian)
+            if (self.grid.exists_empty_cells()):
+                self.grid.move_to_empty(palestinian)
+            else:
+                return False
+
+        return True
 
     def find_nearest_empty(self, pos, neighborhood):
         nearest_empty = None
@@ -280,9 +312,13 @@ class SeparationBarrierModel(Model):
         """
         Advance the model by one step and collect data.
         """
+        self.violence_count = 0
+#        for i in range(100):
         self.schedule.step()
         self.dc.collect(self)
-        #print("Iteration %d " % self.iteration)
+        #print("Violence average %f " % (self.violence_count / 100))
         self.iteration += 1
+        self.total_violence += self.violence_count
+        print("Total Violence: ", self.total_violence)
     #if self.iteration > self.max_iters:
     #    self.running = False
