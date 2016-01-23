@@ -31,6 +31,7 @@ def israeli_palestinian_portrayl(agent):
         color = VIOLENT_COLOR if agent.violent else PALESTINIAN_COLOR
         portrayal["Color"] = color
         size = 1.0 if agent.victim or agent.violent else 0.5
+        size = 4.0 if agent.suicide else size
         portrayal["r"] = size
         portrayal["Layer"] = 1
 
@@ -58,7 +59,11 @@ server = ModularServer(SeparationBarrierModel, [canvas_element],
                       height=40,
                       width=40,
                       settlement_density = 0.3,
-                      palestinian_density = 0.3,
-                      settlers_violence_rate = 0.01
+                      palestinian_density = 0.2,
+                      settlers_violence_rate = 0.01,
+                      settler_vision = 5,
+                      palestinian_vision = 5,
+                      settlers_growth_rate = 0.005,
+                      greed_level=0
                       )
 server.launch()

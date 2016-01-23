@@ -30,6 +30,9 @@ class Settler(Agent):
             self.violent = True
             victim.receive_violence(self, model)
 
+        if len(self.empty_neighbors) > 0 and random.random() < self.model.settlers_growth_rate:
+            print("Another settler!!")
+            self.model.add_settler(random.choice(self.empty_neighbors))
 
 
     def update_neighbors(self, model):
@@ -49,7 +52,7 @@ class Settler(Agent):
     def receive_violence(self, palestinian, model):
         self.victim = True
         # Build a barrier
-        model.set_barrier(palestinian.pos)
+        model.set_barrier(self.pos)
 
 
 class Barrier(Agent):
@@ -62,10 +65,8 @@ class Barrier(Agent):
         self.breed = "Barrier"
 
     def step(self, model):
-        """
-        Inspect local vision and arrest a random active agent. Move if
-        applicable.
-        """
+        return 
+
 class IsraelRear(Agent):
 
     def __init__(self, unique_id, pos, model):
@@ -88,6 +89,7 @@ class Palestinian(Agent):
         self.vision = vision
         self.breed = breed
         self.violent = False
+        self.suicide = False
         self.victim = False
         self.anger = 0
         self.freedom = 0
@@ -111,12 +113,13 @@ class Palestinian(Agent):
 
         if (chance < self.suicide_bombing_probability):
             print ("Sucicide bomb!!")
+            self.suicide = True
         #print("Violence probability %f" % self.violence_probability)
         elif (chance < self.violence_probability):
             # Look for settler neighbours
             settlers_in_vision = [x for x in self.neighbors if x.breed == 'Settler']
             if len(settlers_in_vision) > 0:
-                print("Violent Palestinian!")
+                #print("Violent Palestinian!")
                 # Violent settler. Choose a random palestinian
                 victim = random.choice(settlers_in_vision)
                 self.violent = True
@@ -146,6 +149,7 @@ class Palestinian(Agent):
     def reset_state(self):
         self.violent = False
         self.victim = False
+        self.suicide = False
 
     def anger_decay(self):
         self.anger = max(0, self.anger - 0.1)
@@ -156,7 +160,7 @@ class Palestinian(Agent):
 
 class SeparationBarrierModel(Model):
     def __init__(self, height, width, palestinian_density, settlement_density,
-                 settlers_violence_rate,
+                 settlers_violence_rate, settlers_growth_rate, greed_level,
                  settler_vision=1, palestinian_vision=1, 
                  movement=True, max_iters=1000):
 
@@ -173,7 +177,10 @@ class SeparationBarrierModel(Model):
         self.iteration = 0
         self.schedule = RandomActivation(self)
         self.settlers_violence_rate = settlers_violence_rate
-        self.grid = SingleGrid(height, width, torus=True)
+        self.settlers_growth_rate = settlers_growth_rate
+        self.greed_level = greed_level
+
+        self.grid = SingleGrid(height, width, torus=False)
 
         model_reporters = {
         }
@@ -183,45 +190,103 @@ class SeparationBarrierModel(Model):
         }
         self.dc = DataCollector(model_reporters=model_reporters,
                                 agent_reporters=agent_reporters)
-        unique_id = 0
+        self.unique_id = 0
 
         # Israelis and palestinans split the region in half
         for (contents, x, y) in self.grid.coord_iter():
             if y == self.grid.height - 1:
-                unique_id += 1
-                israel_rear = IsraelRear(unique_id, (x, y), model=self)
+                self.unique_id += 1
+                israel_rear = IsraelRear(self.unique_id, (x, y), model=self)
                 self.grid.position_agent(israel_rear, x,y)
             elif random.random() < self.palestinian_density:
-                palestinian = Palestinian(unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
+                palestinian = Palestinian(self.unique_id, (x, y), vision=self.palestinian_vision, breed="Palestinian",
                           model=self)
-                unique_id += 1
+                self.unique_id += 1
                 self.grid.position_agent(palestinian, x,y)
                 self.schedule.add(palestinian)
             elif ((y > (self.grid.height) * (1-self.settlement_density)) and y < (self.grid.height - 1) and random.random() < self.settlement_density):
-                settler = Settler(unique_id, (x, y),
+                settler = Settler(self.unique_id, (x, y),
                                   vision=self.settler_vision, model=self, breed="Settler")
-                unique_id += 1
+                self.unique_id += 1
                 self.grid.position_agent(settler, x,y)
                 self.schedule.add(settler)
 
+    def add_settler(self, pos):
+        settler = Settler(self.unique_id, pos,
+                          vision=self.settler_vision, model=self, breed="Settler")
+        self.unique_id += 1
+        self.grid.position_agent(settler, pos[0], pos[1])
+        self.schedule.add(settler)
+
     def set_barrier(self,pos):
-        (x,y)  = pos
+        #print("Set barrier - Greed level", self.greed_level)
+        visible_spots = self.grid.get_neighborhood(pos,
+                                                        moore=True, radius=self.greed_level + 1)
+        furthest_empty  = self.find_furthest_empty_or_palestinian(pos, visible_spots)
+        x,y = furthest_empty
         current = self.grid[y][x]
-        print ("Set barrier!!", pos, current)
-        self.grid.move_to_empty(current)
-        print ("Moved to empty")
+        #print ("Set barrier!!", pos, current)
+        if (current is not None and current.breed == "Palestinian"):
+            #print ("Relocating Palestinian")
+            self.relocate_palestinian(current)
         barrier = Barrier(-1, pos, model=self)
         self.grid.position_agent(barrier, x,y)
+
+    def relocate_palestinian(self, palestinian):
+        #print ("Relocating Palestinian in ", palestinian.pos)
+        visible_spots = self.grid.get_neighborhood(palestinian.pos,
+                                                        moore=True, radius=palestinian.vision)
+        nearest_empty = self.find_nearest_empty(palestinian.pos, visible_spots)
+        #print("First Nearest empty to ", palestinian.pos, " Is ", nearest_empty)
+        if (nearest_empty):
+            self.grid.move_agent(palestinian, nearest_empty)
+        else:
+            #print ("Moveing to random empty")
+            self.grid.move_to_empty(palestinian)
+
+    def find_nearest_empty(self, pos, neighborhood):
+        nearest_empty = None
+        sorted_spots = self.sort_neighborhood_by_distance(pos, neighborhood)
+        index = 0
+        while (nearest_empty is None and index < len(sorted_spots)):
+            if self.grid.is_cell_empty(sorted_spots[index]):
+                nearest_empty = sorted_spots[index]
+            index += 1
+
+        return nearest_empty
+
+    def find_furthest_empty_or_palestinian(self, pos, neighborhood):
+        furthest_empty = None
+        sorted_spots = self.sort_neighborhood_by_distance(pos, neighborhood)
+        sorted_spots.reverse()
+        index = 0
+        while (furthest_empty is None and index < len(sorted_spots)):
+            spot = sorted_spots[index]
+            if self.grid.is_cell_empty(spot) or self.grid[spot[1]][spot[0]].breed == "Palestinian" :
+                furthest_empty = sorted_spots[index]
+            index += 1
+
+        return furthest_empty
+
+
+
+    def sort_neighborhood_by_distance(self, from_pos, neighbor_spots):
+        from_x, from_y = from_pos
+        return sorted(neighbor_spots, key = lambda spot: self.eucledean_distance(from_x, spot[0], from_y, spot[1], self.grid.width, self.grid.height))
+
+
+    def eucledean_distance(self, x1,x2,y1,y2,w,h):
+        # http://stackoverflow.com/questions/2123947/calculate-distance-between-two-x-y-coordinates
+        return math.sqrt(min(abs(x1 - x2), w - abs(x1 - x2)) ** 2 + min(abs(y1 - y2), h - abs(y1-y2)) ** 2)
         
 
     def step(self):
         """
         Advance the model by one step and collect data.
         """
-        if (self.iteration < 10000000):
-            self.schedule.step()
-            self.dc.collect(self)
-            #print("Iteration %d " % self.iteration)
-            self.iteration += 1
-        #if self.iteration > self.max_iters:
-        #    self.running = False
+        self.schedule.step()
+        self.dc.collect(self)
+        #print("Iteration %d " % self.iteration)
+        self.iteration += 1
+    #if self.iteration > self.max_iters:
+    #    self.running = False
