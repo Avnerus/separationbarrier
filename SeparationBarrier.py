@@ -94,7 +94,6 @@ class Palestinian(Agent):
         self.victim = False
         self.anger = 0
         self.freedom = 0
-        self.attackProbability = 0
 
 
     def step(self, model):
@@ -112,9 +111,8 @@ class Palestinian(Agent):
 
         self.violence_probability = (1 - math.exp(-1.5* ((1-self.freedom) * 0.01  + self.anger * 2))) * (1-self.blockage)
         self.suicide_bombing_probability = self.violence_probability * model.suicide_rate
-        if (self.anger > 0):
-            print("Freedom: ", self.freedom, "Anger: ", self.anger, " Blocakge ", self.blockage)
-            print("Violence probability ", self.violence_probability, " Suicide: ", self.suicide_bombing_probability)
+        #print("Freedom: ", self.freedom, "Anger: ", self.anger, " Blocakge ", self.blockage)
+        #print("Violence probability ", self.violence_probability, " Suicide: ", self.suicide_bombing_probability)
             
         chance = random.random()
 
@@ -203,8 +201,8 @@ class SeparationBarrierModel(Model):
         model_reporters = {
         }
         agent_reporters = {
-            "x": lambda a: a.pos[0],
-            "y": lambda a: a.pos[1],
+#           "x": lambda a: a.pos[0],
+#           "y": lambda a: a.pos[1],
         }
         self.dc = DataCollector(model_reporters=model_reporters,
                                 agent_reporters=agent_reporters)
@@ -313,12 +311,15 @@ class SeparationBarrierModel(Model):
         Advance the model by one step and collect data.
         """
         self.violence_count = 0
-#        for i in range(100):
-        self.schedule.step()
-        self.dc.collect(self)
-        #print("Violence average %f " % (self.violence_count / 100))
-        self.iteration += 1
+        for i in range(100):
+            self.schedule.step()
         self.total_violence += self.violence_count
+        average = self.violence_count / 100
+        #print("Violence average %f " % average)
         print("Total Violence: ", self.total_violence)
+        if (average < 0.001):
+            self.dc.collect(self)
+            self.running = False
+            print("Done")
     #if self.iteration > self.max_iters:
     #    self.running = False
