@@ -10,6 +10,7 @@ PALESTINIAN_COLOR = "#FF0000"
 VIOLENT_COLOR = "#000000"
 BARRIER_COLOR = "#BDBDBD"
 ISRAEL_REAR_COLOR ="#00EEFF"
+VICTIM_COLOR = "#FFF700"
 
 def israeli_palestinian_portrayl(agent):
     if agent is None:
@@ -21,6 +22,8 @@ def israeli_palestinian_portrayl(agent):
 
     if type(agent) is Settler:
         color = VIOLENT_COLOR if agent.violent else ISRAELI_COLOR
+        if agent.victim:
+            color = VICTIM_COLOR
         portrayal["Color"] = color
         size = 1.0 if agent.violent or agent.victim else 0.5
         portrayal["r"] = portrayal["w"] = portrayal["h"] = size
@@ -29,6 +32,8 @@ def israeli_palestinian_portrayl(agent):
 
     elif type(agent) is Palestinian:
         color = VIOLENT_COLOR if agent.violent else PALESTINIAN_COLOR
+        if agent.victim:
+            color = VICTIM_COLOR
         portrayal["Color"] = color
         size = 1.0 if agent.victim or agent.violent else 0.5
         size = 4.0 if agent.suicide else size
@@ -54,7 +59,7 @@ def israeli_palestinian_portrayl(agent):
     return portrayal
 
 canvas_element = SeparationBarrierGrid(israeli_palestinian_portrayl, 40, 40, 600, 600)
-greed = 0 
+greed = 4
 server = ModularServer(SeparationBarrierModel, [canvas_element],
                       "Separation Barrier - Greed Level %d" % (greed),
                       height=40,

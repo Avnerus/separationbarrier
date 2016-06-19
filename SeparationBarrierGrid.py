@@ -10,4 +10,6 @@ class SeparationBarrierGrid(CanvasGrid):
         super(SeparationBarrierGrid, self).__init__(portrayal_method, grid_height, grid_width, canvas_height, canvas_width)
 
     def render(self, model):
-        return super(SeparationBarrierGrid, self).render(model)
+        rendered_model =  super(SeparationBarrierGrid, self).render(model)
+        rendered_model["totalViolence"] = model.total_violence
+        return rendered_model

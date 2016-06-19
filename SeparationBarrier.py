@@ -311,15 +311,15 @@ class SeparationBarrierModel(Model):
         Advance the model by one step and collect data.
         """
         self.violence_count = 0
-        for i in range(100):
-            self.schedule.step()
+      #  for i in range(100):
+        self.schedule.step()
         self.total_violence += self.violence_count
-        average = self.violence_count / 100
+      #  average = self.violence_count / 100
         #print("Violence average %f " % average)
         print("Total Violence: ", self.total_violence)
-        if (average < 0.001):
-            self.dc.collect(self)
-            self.running = False
-            print("Done")
+       # if (average < 0.001):
+       #     self.dc.collect(self)
+       #     self.running = False
+       #     print("Done")
     #if self.iteration > self.max_iters:
     #    self.running = False
