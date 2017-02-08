@@ -73,5 +73,5 @@ server = ModularServer(SeparationBarrierModel, [canvas_element],
                       suicide_rate = 0.001,
                       greed_level=greed,
                       )
-server.port = 6666
+server.port = 9540 
 server.launch()
