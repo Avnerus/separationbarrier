@@ -7,10 +7,12 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
     canvas_tag += "style='border:1px dotted;margin:auto;display:block;'></canvas>";
     // Append it to body:
     var canvas = $(canvas_tag)[0];
+    $("body").append(
+        '<div id="background"' + 
+        'style="position:absolute;top:0;left:0;height:100%;width:100%;opacity:0.5;' +
+        'background-image: url(local/map.png);z-index:-1;"></div>'
+    );
     $("body").append(canvas);
-    $("body").css("background-image", "url(local/map.png)")
-    $("body").css("background-position", "100% 75%")
-    $("body").css("background-size", "270% 270%")
     $("h2").css("text-align", "center")
     $("h2").css("color", "black")
     $("h2").css("font-size", "16px")

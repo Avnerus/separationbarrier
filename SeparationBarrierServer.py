@@ -59,7 +59,7 @@ def israeli_palestinian_portrayl(agent):
     return portrayal
 
 canvas_element = SeparationBarrierGrid(israeli_palestinian_portrayl, 40, 40, 600, 600)
-greed = 4
+greed = 6 
 server = ModularServer(SeparationBarrierModel, [canvas_element],
                       "Separation Barrier - Greed Level %d" % (greed),
                       height=40,
@@ -73,5 +73,5 @@ server = ModularServer(SeparationBarrierModel, [canvas_element],
                       suicide_rate = 0.001,
                       greed_level=greed,
                       )
-server.port = 6666
+server.port = 9540
 server.launch()
