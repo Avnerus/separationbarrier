@@ -9,16 +9,10 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
     var canvas = $(canvas_tag)[0];
     $("body").append(
         '<div id="background"' + 
-        'style="position:absolute;top:0;left:0;height:100%;width:100%;opacity:0.5;' +
-        'background-image: url(local/map.png);z-index:-1;"></div>'
+        'style="position:absolute;top:0;left:0;height:1080px;width:1920px;opacity:0.8;' +
+        'background-image: url(local/map1.png);background-size:150%;background-position: -1450px 1000px;;z-index:-1;"></div>'
     );
     $("body").append(canvas);
-<<<<<<< HEAD
-=======
-    $("body").css("background-image", "url(local/map.png)")
-    $("body").css("background-position", "-650px")
-    $("body").css("background-size", "135%")
->>>>>>> 24823afbed55b36b9a05606ba70ad274e20cbbf8
     $("h2").css("text-align", "center")
     $("h2").css("color", "black")
     $("h2").css("font-size", "16px")
@@ -37,7 +31,7 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
         for (var layer in data)
             canvasDraw.drawLayer(data[layer]);
         $("#total-violence").text("Total Violence: " + data.totalViolence);
-        canvasDraw.drawGridLines("#eee");
+        canvasDraw.drawGridLines("#101010");
         this.drawGreenLine();
     };
 
