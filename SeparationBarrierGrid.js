@@ -31,7 +31,7 @@ var CanvasModule  = function(canvas_width, canvas_height, grid_width, grid_heigh
         for (var layer in data)
             canvasDraw.drawLayer(data[layer]);
         $("#total-violence").text("Total Violence: " + data.totalViolence);
-        canvasDraw.drawGridLines("#101010");
+        canvasDraw.drawGridLines("#a0a0a0");
         this.drawGreenLine();
     };
 
